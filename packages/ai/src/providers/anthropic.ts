@@ -412,7 +412,7 @@ function resolveAnthropicBaseUrl(model: Model<"anthropic-messages">, apiKey?: st
 		}
 	}
 	if (model.provider === "anthropic") {
-		return normalizeBaseUrl(model.baseUrl) ?? "https://api.anthropic.com";
+		return normalizeBaseUrl($env.ANTHROPIC_BASE_URL) ?? normalizeBaseUrl(model.baseUrl) ?? "https://api.anthropic.com";
 	}
 	return normalizeBaseUrl(model.baseUrl);
 }

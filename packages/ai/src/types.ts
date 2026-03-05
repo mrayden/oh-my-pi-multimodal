@@ -106,7 +106,8 @@ export type KnownProvider =
 	| "vllm"
 	| "xiaomi"
 	| "zenmux"
-	| "lm-studio";
+	| "lm-studio"
+	| "deepseek";
 export type Provider = KnownProvider | string;
 
 import type { ThinkingEffort, ThinkingLevel } from "./thinking";

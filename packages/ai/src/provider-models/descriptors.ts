@@ -256,6 +256,7 @@ export const PROVIDER_DESCRIPTORS: readonly ProviderDescriptor[] = [
 		config => cursorModelManagerOptions(config),
 		catalog("Cursor", ["CURSOR_API_KEY"], { oauthProvider: "cursor" }),
 	),
+	descriptor("deepseek", "deepseek-chat", config => deepseekModelManagerOptions(config)),
 ] as const;
 
 /** Default model IDs for all known providers, built from descriptors + special providers. */
@@ -272,4 +273,5 @@ export const DEFAULT_MODEL_PER_PROVIDER: Record<KnownProvider, string> = {
 	"openai-codex": "gpt-5.3-codex",
 	zai: "glm-4.6",
 	"gitlab-duo": "duo-chat-sonnet-4-5",
+	deepseek: "deepseek-chat",
 } as Record<KnownProvider, string>;
