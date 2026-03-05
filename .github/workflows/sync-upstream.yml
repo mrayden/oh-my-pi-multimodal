@@ -53,8 +53,10 @@ jobs:
       - name: Re-apply fork identity after merge
         if: steps.commit_count.outputs.count != '0' && steps.merge.outputs.merge_failed != 'true'
         run: |
-          # APP_NAME — upstream always says "omp"; we need "ompm"
-          sed -i 's/export const APP_NAME: string = "omp";/export const APP_NAME: string = "ompm";/' \
+          # APP_NAME + CONFIG_DIR_NAME — upstream always says "omp"/".omp"; we need "ompm"/".ompm"
+          sed -i \
+            -e 's/export const APP_NAME: string = "omp";/export const APP_NAME: string = "ompm";/' \
+            -e 's/export const CONFIG_DIR_NAME: string = "\.omp";/export const CONFIG_DIR_NAME: string = ".ompm";/' \
             packages/utils/src/dirs.ts
 
           # install.sh REPO and source-mode REF default

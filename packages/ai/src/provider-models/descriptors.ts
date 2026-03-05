@@ -36,6 +36,7 @@ import {
 	xaiModelManagerOptions,
 	xiaomiModelManagerOptions,
 	zenmuxModelManagerOptions,
+	deepseekModelManagerOptions,
 } from "./openai-compat";
 import { cursorModelManagerOptions } from "./special";
 
