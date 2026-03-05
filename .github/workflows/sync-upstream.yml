@@ -50,6 +50,50 @@ jobs:
           git push origin main
           echo "merge_failed=false" >> "$GITHUB_OUTPUT"
 
+      - name: Re-apply fork identity after merge
+        if: steps.commit_count.outputs.count != '0' && steps.merge.outputs.merge_failed != 'true'
+        run: |
+          # APP_NAME — upstream always says "omp"; we need "ompm"
+          sed -i 's/export const APP_NAME: string = "omp";/export const APP_NAME: string = "ompm";/' \
+            packages/utils/src/dirs.ts
+
+          # install.sh REPO and source-mode REF default
+          sed -i 's|^REPO="can1357/oh-my-pi"|REPO="mrayden/oh-my-pi-multimodal"|' scripts/install.sh
+          grep -q 'Fork: source without' scripts/install.sh || {
+            sed -i '/^if \[ "\$MODE" = "source" \] && \[ -z "\$REF" \]; then/,+2d' scripts/install.sh
+            sed -i '/^# If a ref is provided/a # Fork: source without --ref defaults to main branch (no npm package for this fork)\nif [ "$MODE" = "source" ] && [ -z "$REF" ]; then\n    REF="main"\nfi' \
+              scripts/install.sh
+          }
+
+          # bin name in coding-agent package.json
+          python3 -c "
+import json
+with open('packages/coding-agent/package.json') as f: d = json.load(f)
+if 'omp' in d.get('bin', {}):
+    d['bin']['ompm'] = d['bin'].pop('omp')
+    with open('packages/coding-agent/package.json', 'w') as f:
+        json.dump(d, f, indent='\\t'); f.write('\\n')
+    print('Fixed bin: omp -> ompm')
+"
+
+          # User-facing command strings in source files
+          sed -i \
+            -e 's/Install with: omp plugin install/Install with: ompm plugin install/' \
+            packages/coding-agent/src/modes/components/plugin-settings.ts
+          sed -i \
+            -e 's/Usage: omp ssh/Usage: ompm ssh/g' \
+            -e 's/Add one with: omp ssh/Add one with: ompm ssh/g' \
+            packages/coding-agent/src/cli/ssh-cli.ts
+          sed -i 's/omp agents unpack/ompm agents unpack/g' \
+            packages/coding-agent/src/cli/args.ts
+
+          # Commit only if upstream dirtied our fork-specific files
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: re-apply fork identity after upstream sync'
+            git push origin main
+          fi
+
       - name: Get new version from package.json
         id: version
         if: steps.commit_count.outputs.count != '0' && steps.merge.outputs.merge_failed != 'true'
