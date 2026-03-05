@@ -1,0 +1,89 @@
+# Syncs upstream can1357/oh-my-pi main → fork main daily.
+# Requires the DISCORD_WEBHOOK_URL secret to be set in repo Settings → Secrets → Actions.
+
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # Daily at 06:00 UTC
+  workflow_dispatch:       # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up git identity
+        run: |
+          git config user.name "aiproxy-bot"
+          git config user.email "proxy@ai-auth-proxy.ayden.gg"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/can1357/oh-my-pi.git
+
+      - name: Fetch upstream
+        run: |
+          git fetch upstream main
+
+      - name: Get pending commit count
+        id: commit_count
+        run: |
+          COUNT=$(git rev-list HEAD..upstream/main --count)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Pending commits: $COUNT"
+
+      - name: Merge upstream and push
+        id: merge
+        if: steps.commit_count.outputs.count != '0'
+        run: |
+          git merge --no-edit upstream/main || {
+            git merge --abort
+            echo "merge_failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+          git push origin main
+          echo "merge_failed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Get new version from package.json
+        id: version
+        if: steps.commit_count.outputs.count != '0' && steps.merge.outputs.merge_failed != 'true'
+        run: |
+          VERSION=$(cat packages/ai/package.json | jq -r .version 2>/dev/null \
+            || cat package.json | jq -r .version 2>/dev/null \
+            || echo "unknown")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Discord notification — success (changes merged)
+        if: steps.commit_count.outputs.count != '0' && steps.merge.outputs.merge_failed != 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COUNT: ${{ steps.commit_count.outputs.count }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Upstream sync complete\",\"color\":5763719,\"fields\":[{\"name\":\"Commits merged\",\"value\":\"$COUNT\",\"inline\":true},{\"name\":\"Version\",\"value\":\"$VERSION\",\"inline\":true}],\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}"
+
+      - name: Discord notification — already up to date
+        if: steps.commit_count.outputs.count == '0'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Upstream sync — already up to date\",\"color\":9807270,\"description\":\"No new commits from upstream.\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}"
+
+      - name: Discord notification — merge conflict / failure
+        if: failure() || steps.merge.outputs.merge_failed == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Upstream sync FAILED\",\"color\":15548997,\"description\":\"Merge conflict or push error. Manual intervention required.\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}"
