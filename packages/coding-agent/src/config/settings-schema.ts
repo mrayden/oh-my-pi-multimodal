@@ -569,7 +569,7 @@ export const SETTINGS_SCHEMA = {
 	},
 	"async.enabled": {
 		type: "boolean",
-		default: false,
+		default: true,
 		ui: {
 			tab: "tools",
 			label: "Async execution",
